@@ -1,0 +1,11 @@
+site_id,timestamp,temperature,humidity,dust_level,noise_level,equipment_status,worker_count,unsafe_condition
+SITE-001,2026-09-01 09:00,32,60,35,70,Normal,25,No
+SITE-001,2026-09-01 10:00,35,65,45,75,Normal,28,No
+SITE-001,2026-09-01 11:00,41,72,75,88,Normal,30,Yes
+SITE-001,2026-09-01 12:00,44,78,90,95,Faulty,32,Yes
+SITE-001,2026-09-01 13:00,38,70,60,82,Normal,27,Yes
+SITE-002,2026-09-01 09:00,30,55,25,65,Normal,20,No
+SITE-002,2026-09-01 10:00,33,60,40,70,Normal,22,No
+SITE-002,2026-09-01 11:00,39,68,65,85,Maintenance,24,Yes
+SITE-002,2026-09-01 12:00,43,75,85,92,Faulty,26,Yes
+SITE-002,2026-09-01 13:00,36,62,50,76,Normal,23,No
