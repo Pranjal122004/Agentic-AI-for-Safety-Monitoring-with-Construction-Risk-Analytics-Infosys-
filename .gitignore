@@ -1,0 +1,11 @@
+venv/
+__pycache__/
+*.pyc
+*.pyo
+
+models/*.pt
+
+uploads/
+runs/
+
+backend/data/ppe_dataset/
