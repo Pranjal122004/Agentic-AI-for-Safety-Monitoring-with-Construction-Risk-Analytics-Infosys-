@@ -8,7 +8,7 @@ import requests
 
 st.set_page_config(
     page_title="Construction Safety Intelligence",
-    page_icon="🏗️",
+    page_icon="🦺",
     layout="wide"
 )
 
@@ -17,7 +17,7 @@ st.set_page_config(
 # Title
 # ============================================================
 
-st.title("🏗️ Construction Safety Intelligence Platform")
+st.title("🦺 Construction Safety Intelligence Platform")
 
 st.markdown(
     """
@@ -48,15 +48,19 @@ try:
     )
 
     if health_response.status_code == 200:
+
         st.success("🟢 Safety API is connected")
 
     else:
-        st.warning("🟡 Safety API returned an unexpected response")
+
+        st.warning(
+            "🟡 Safety API returned an unexpected response"
+        )
 
 except requests.exceptions.RequestException:
 
     st.error(
-        "🔴 Cannot connect to FastAPI. "
+        "🔴 Cannot connect to FastAPI.\n\n"
         "Start the backend with:\n\n"
         "`uvicorn backend.app.main:app --reload`"
     )
@@ -75,7 +79,7 @@ tab1, tab2 = st.tabs(
 
 
 # ============================================================
-# TAB 1 — PPE SAFETY
+# TAB 1 — PPE SAFETY ANALYSIS
 # ============================================================
 
 with tab1:
@@ -83,9 +87,13 @@ with tab1:
     st.header("🦺 Worker PPE Safety Analysis")
 
     st.write(
-        "Upload a construction-site image from the Kaggle "
+        "Upload a construction-site image from the "
         "construction safety dataset."
     )
+
+    # --------------------------------------------------------
+    # Image Upload
+    # --------------------------------------------------------
 
     uploaded_file = st.file_uploader(
         "Choose a construction image",
@@ -99,7 +107,7 @@ with tab1:
     if uploaded_file is not None:
 
         # ----------------------------------------------------
-        # Display uploaded image
+        # Display Uploaded Image
         # ----------------------------------------------------
 
         st.image(
@@ -110,6 +118,10 @@ with tab1:
 
         st.divider()
 
+        # ----------------------------------------------------
+        # Analyze Button
+        # ----------------------------------------------------
+
         analyze_button = st.button(
             "🔍 Analyze PPE Safety",
             type="primary"
@@ -118,10 +130,15 @@ with tab1:
         if analyze_button:
 
             with st.spinner(
-                "YOLO is detecting PPE and the Safety Agent is analyzing the result..."
+                "YOLO is detecting PPE and the Safety Agent "
+                "is analyzing the result..."
             ):
 
                 try:
+
+                    # ------------------------------------------------
+                    # Prepare uploaded file
+                    # ------------------------------------------------
 
                     files = {
                         "file": (
@@ -131,11 +148,19 @@ with tab1:
                         )
                     }
 
+                    # ------------------------------------------------
+                    # Send image to FastAPI
+                    # ------------------------------------------------
+
                     response = requests.post(
                         f"{API_URL}/analyze-ppe",
                         files=files,
                         timeout=120
                     )
+
+                    # =================================================
+                    # SUCCESS
+                    # =================================================
 
                     if response.status_code == 200:
 
@@ -153,6 +178,10 @@ with tab1:
 
                         else:
 
+                            # =================================================
+                            # Extract API response
+                            # =================================================
+
                             safety = data.get(
                                 "safety_analysis",
                                 {}
@@ -163,156 +192,167 @@ with tab1:
                                 []
                             )
 
-                            # ============================================
-                            # SAFETY SUMMARY
-                            # ============================================
-
-                            st.subheader(
-                                "Safety Assessment"
-                            )
-
-                            score = safety.get(
-                                "safety_score",
-                                0
-                            )
-
-                            level = safety.get(
-                                "safety_level",
+                            risk_level = safety.get(
+                                "risk_level",
                                 "UNKNOWN"
                             )
 
-                            violations = safety.get(
-                                "violations",
+                            hazards = safety.get(
+                                "hazards",
                                 []
                             )
 
-                            alert = safety.get(
-                                "alert",
-                                "No alert available."
+                            recommendations = safety.get(
+                                "recommendations",
+                                []
+                            )
+
+                            status = safety.get(
+                                "status",
+                                "No status available."
+                            )
+
+                            # =================================================
+                            # SAFETY ASSESSMENT
+                            # =================================================
+
+                            st.subheader(
+                                "🛡️ Safety Assessment"
                             )
 
                             col1, col2, col3 = st.columns(3)
 
+                            # ------------------------------------------------
+                            # Risk Level
+                            # ------------------------------------------------
+
                             with col1:
 
                                 st.metric(
-                                    "Safety Score",
-                                    f"{score}/100"
+                                    "Risk Level",
+                                    risk_level
                                 )
+
+                            # ------------------------------------------------
+                            # Hazards
+                            # ------------------------------------------------
 
                             with col2:
 
                                 st.metric(
-                                    "Safety Level",
-                                    level
+                                    "Hazards Detected",
+                                    len(hazards)
                                 )
+
+                            # ------------------------------------------------
+                            # Recommendations
+                            # ------------------------------------------------
 
                             with col3:
 
                                 st.metric(
-                                    "Violations",
-                                    len(violations)
+                                    "Recommendations",
+                                    len(recommendations)
                                 )
 
-                            # ============================================
-                            # SAFETY STATUS
-                            # ============================================
+                            # =================================================
+                            # RISK STATUS
+                            # =================================================
 
-                            if level == "SAFE":
+                            st.subheader(
+                                "🚨 Safety Status"
+                            )
+
+                            if risk_level == "LOW":
 
                                 st.success(
-                                    "🟢 SAFE — "
-                                    "Worker PPE compliance is satisfactory."
+                                    "🟢 LOW RISK — "
+                                    "Required PPE appears compliant."
                                 )
 
-                            elif level == "MODERATE":
+                            elif risk_level == "MEDIUM":
 
                                 st.warning(
-                                    "🟡 MODERATE — "
-                                    "PPE compliance should be improved."
+                                    "🟡 MEDIUM RISK — "
+                                    "Preventive safety action is recommended."
                                 )
 
-                            elif level == "HIGH RISK":
+                            elif risk_level == "HIGH":
 
                                 st.error(
-                                    "🟠 HIGH RISK — "
-                                    "Urgent safety action is required."
+                                    "🔴 HIGH RISK — "
+                                    "Urgent safety intervention is required."
                                 )
 
-                            else:
+                            elif risk_level == "CRITICAL":
 
                                 st.error(
-                                    "🔴 CRITICAL — "
+                                    "🚨 CRITICAL — "
                                     "Immediate intervention is required."
                                 )
 
-                            # ============================================
-                            # ALERT
-                            # ============================================
+                            else:
 
-                            st.subheader(
-                                "🚨 Safety Alert"
-                            )
+                                st.warning(
+                                    f"Risk level: {risk_level}"
+                                )
+
+                            # =================================================
+                            # SAFETY MESSAGE
+                            # =================================================
 
                             st.info(
-                                alert
+                                status
                             )
 
-                            # ============================================
-                            # DETECTED PPE
-                            # ============================================
-
-                            st.subheader(
-                                "🦺 Detected PPE"
-                            )
-
-                            detected_ppe = safety.get(
-                                "detected_ppe",
-                                []
-                            )
-
-                            if detected_ppe:
-
-                                for item in detected_ppe:
-
-                                    st.write(
-                                        f"✅ {item}"
-                                    )
-
-                            else:
-
-                                st.write(
-                                    "No compliant PPE detected."
-                                )
-
-                            # ============================================
-                            # VIOLATIONS
-                            # ============================================
-
-                            st.subheader(
-                                "⚠️ PPE Violations"
-                            )
-
-                            if violations:
-
-                                for violation in violations:
-
-                                    st.error(
-                                        f"❌ {violation}"
-                                    )
-
-                            else:
-
-                                st.success(
-                                    "No PPE violations detected."
-                                )
-
-                            # ============================================
-                            # YOLO DETECTIONS
-                            # ============================================
+                            # =================================================
+                            # DETECTED OBJECTS
+                            # =================================================
 
                             st.subheader(
                                 "🔎 YOLO Detection Results"
+                            )
+
+                            if detections:
+
+                                # Count detections by class
+                                detection_counts = {}
+
+                                for detection in detections:
+
+                                    class_name = detection.get(
+                                        "class",
+                                        "Unknown"
+                                    )
+
+                                    detection_counts[class_name] = (
+                                        detection_counts.get(
+                                            class_name,
+                                            0
+                                        ) + 1
+                                    )
+
+                                # Display detection counts
+
+                                for class_name, count in detection_counts.items():
+
+                                    st.write(
+                                        f"• **{class_name}** — "
+                                        f"{count} detected"
+                                    )
+
+                            else:
+
+                                st.warning(
+                                    "No objects were detected."
+                                )
+
+                            # =================================================
+                            # PPE DETECTIONS WITH CONFIDENCE
+                            # =================================================
+
+                            st.subheader(
+                                "🦺 Detailed PPE Detections"
                             )
 
                             if detections:
@@ -329,117 +369,474 @@ with tab1:
                                         0
                                     )
 
+                                    confidence_percent = (
+                                        confidence * 100
+                                    )
+
                                     st.write(
                                         f"**{class_name}** — "
-                                        f"confidence: {confidence:.3f}"
+                                        f"{confidence_percent:.1f}% confidence"
                                     )
 
                             else:
 
-                                st.warning(
-                                    "No objects were detected."
+                                st.write(
+                                    "No detections available."
                                 )
+
+                            # =================================================
+                            # HAZARDS
+                            # =================================================
+
+                            st.subheader(
+                                "⚠️ Detected Hazards"
+                            )
+
+                            if hazards:
+
+                                for hazard in hazards:
+
+                                    st.error(
+                                        f"⚠️ {hazard}"
+                                    )
+
+                            else:
+
+                                st.success(
+                                    "✅ No PPE hazards detected."
+                                )
+
+                            # =================================================
+                            # RECOMMENDATIONS
+                            # =================================================
+
+                            st.subheader(
+                                "🛡️ Safety Recommendations"
+                            )
+
+                            if recommendations:
+
+                                for recommendation in recommendations:
+
+                                    st.info(
+                                        f"💡 {recommendation}"
+                                    )
+
+                            else:
+
+                                st.success(
+                                    "No additional recommendations."
+                                )
+
+                            # =================================================
+                            # RAW API INFORMATION
+                            # =================================================
+
+                            with st.expander(
+                                "View Technical Analysis"
+                            ):
+
+                                st.json(
+                                    data
+                                )
+
+                    # =================================================
+                    # API ERROR
+                    # =================================================
 
                     else:
 
                         st.error(
-                            f"FastAPI returned HTTP "
-                            f"{response.status_code}"
+                            f"API request failed. "
+                            f"Status code: {response.status_code}"
                         )
 
-                        st.code(
-                            response.text
-                        )
+                        try:
 
-                except requests.exceptions.RequestException as error:
+                            st.json(
+                                response.json()
+                            )
+
+                        except Exception:
+
+                            st.write(
+                                response.text
+                            )
+
+                # =========================================================
+                # CONNECTION ERROR
+                # =========================================================
+
+                except requests.exceptions.ConnectionError:
 
                     st.error(
-                        "Could not connect to the Safety API."
+                        "🔴 Could not connect to FastAPI.\n\n"
+                        "Make sure the backend is running:\n\n"
+                        "`uvicorn backend.app.main:app --reload`"
                     )
 
-                    st.code(
-                        str(error)
+                # =========================================================
+                # TIMEOUT ERROR
+                # =========================================================
+
+                except requests.exceptions.Timeout:
+
+                    st.error(
+                        "⏱️ The PPE analysis took too long. "
+                        "Please try again."
+                    )
+
+                # =========================================================
+                # OTHER ERROR
+                # =========================================================
+
+                except Exception as e:
+
+                    st.error(
+                        f"An unexpected error occurred: {str(e)}"
                     )
 
 
 # ============================================================
-# TAB 2 — SITE RISK
+# TAB 2 — SITE RISK MONITORING
 # ============================================================
 
 with tab2:
 
-    st.header("📊 Construction Site Risk Monitoring")
-
-    st.write(
-        "View risk analysis generated by the Site Risk Agent."
+    st.header(
+        "📊 Construction Site Risk Monitoring"
     )
 
-    if st.button(
-        "🔄 Load Site Risk Data"
-    ):
+    st.write(
+        "Analyze environmental and equipment-related "
+        "construction-site risks."
+    )
 
-        try:
+    # --------------------------------------------------------
+    # Analyze Site Risk Button
+    # --------------------------------------------------------
 
-            response = requests.get(
-                f"{API_URL}/site-risk",
-                timeout=30
-            )
+    site_risk_button = st.button(
+        "🔍 Analyze Site Risk",
+        type="primary"
+    )
 
-            if response.status_code == 200:
+    if site_risk_button:
 
-                data = response.json()
+        with st.spinner(
+            "Safety Agent is analyzing site monitoring data..."
+        ):
 
-                results = data.get(
-                    "results",
-                    []
+            try:
+
+                # ------------------------------------------------
+                # Call Site Risk API
+                # ------------------------------------------------
+
+                response = requests.get(
+                    f"{API_URL}/site-risk",
+                    timeout=30
                 )
 
-                st.metric(
-                    "Total Records",
-                    data.get(
+                # =================================================
+                # SUCCESS
+                # =================================================
+
+                if response.status_code == 200:
+
+                    data = response.json()
+
+                    results = data.get(
+                        "results",
+                        []
+                    )
+
+                    total_records = data.get(
                         "total_records",
                         len(results)
                     )
-                )
 
-                if results:
+                    # =================================================
+                    # SUMMARY
+                    # =================================================
 
-                    st.dataframe(
-                        results,
-                        use_container_width=True
+                    st.subheader(
+                        "📋 Site Risk Summary"
                     )
+
+                    # ------------------------------------------------
+                    # Calculate summary values
+                    # ------------------------------------------------
+
+                    if results:
+
+                        risk_scores = [
+                            result.get(
+                                "risk_score",
+                                0
+                            )
+                            for result in results
+                        ]
+
+                        average_score = (
+                            sum(risk_scores)
+                            / len(risk_scores)
+                        )
+
+                        highest_score = max(
+                            risk_scores
+                        )
+
+                        critical_count = sum(
+                            1
+                            for result in results
+                            if result.get(
+                                "risk_level"
+                            ) == "CRITICAL"
+                        )
+
+                        high_count = sum(
+                            1
+                            for result in results
+                            if result.get(
+                                "risk_level"
+                            ) == "HIGH"
+                        )
+
+                    else:
+
+                        average_score = 0
+                        highest_score = 0
+                        critical_count = 0
+                        high_count = 0
+
+                    col1, col2, col3, col4 = st.columns(4)
+
+                    with col1:
+
+                        st.metric(
+                            "Monitoring Records",
+                            total_records
+                        )
+
+                    with col2:
+
+                        st.metric(
+                            "Average Risk Score",
+                            f"{average_score:.1f}"
+                        )
+
+                    with col3:
+
+                        st.metric(
+                            "Highest Risk Score",
+                            highest_score
+                        )
+
+                    with col4:
+
+                        st.metric(
+                            "High/Critical Records",
+                            high_count + critical_count
+                        )
+
+                    # =================================================
+                    # SITE RISK RESULTS
+                    # =================================================
+
+                    st.subheader(
+                        "📊 Risk Analysis Results"
+                    )
+
+                    if results:
+
+                        for result in results:
+
+                            site_id = result.get(
+                                "site_id",
+                                "Unknown"
+                            )
+
+                            timestamp = result.get(
+                                "timestamp",
+                                "Unknown"
+                            )
+
+                            risk_score = result.get(
+                                "risk_score",
+                                0
+                            )
+
+                            risk_level = result.get(
+                                "risk_level",
+                                "UNKNOWN"
+                            )
+
+                            hazards = result.get(
+                                "hazards",
+                                []
+                            )
+
+                            recommendation = result.get(
+                                "recommendation",
+                                "No recommendation."
+                            )
+
+                            # ------------------------------------------------
+                            # Result container
+                            # ------------------------------------------------
+
+                            with st.container():
+
+                                st.markdown(
+                                    f"### 🏗️ {site_id}"
+                                )
+
+                                st.write(
+                                    f"**Timestamp:** {timestamp}"
+                                )
+
+                                result_col1, result_col2 = st.columns(2)
+
+                                with result_col1:
+
+                                    st.metric(
+                                        "Risk Score",
+                                        f"{risk_score}/100"
+                                    )
+
+                                with result_col2:
+
+                                    st.metric(
+                                        "Risk Level",
+                                        risk_level
+                                    )
+
+                                # ------------------------------------------------
+                                # Risk-level message
+                                # ------------------------------------------------
+
+                                if risk_level == "CRITICAL":
+
+                                    st.error(
+                                        "🚨 CRITICAL RISK — "
+                                        "Immediate action required."
+                                    )
+
+                                elif risk_level == "HIGH":
+
+                                    st.error(
+                                        "🔴 HIGH RISK — "
+                                        "Urgent safety review required."
+                                    )
+
+                                elif risk_level == "MEDIUM":
+
+                                    st.warning(
+                                        "🟡 MEDIUM RISK — "
+                                        "Preventive action recommended."
+                                    )
+
+                                else:
+
+                                    st.success(
+                                        "🟢 LOW RISK — "
+                                        "Site conditions are acceptable."
+                                    )
+
+                                # ------------------------------------------------
+                                # Hazards
+                                # ------------------------------------------------
+
+                                if hazards:
+
+                                    st.write(
+                                        "**Hazards:**"
+                                    )
+
+                                    for hazard in hazards:
+
+                                        st.write(
+                                            f"⚠️ {hazard}"
+                                        )
+
+                                else:
+
+                                    st.write(
+                                        "✅ No hazards detected."
+                                    )
+
+                                # ------------------------------------------------
+                                # Recommendation
+                                # ------------------------------------------------
+
+                                st.write(
+                                    "**Recommendation:**"
+                                )
+
+                                st.info(
+                                    recommendation
+                                )
+
+                                st.divider()
+
+                    else:
+
+                        st.warning(
+                            "No site monitoring records found."
+                        )
+
+                # =================================================
+                # API ERROR
+                # =================================================
 
                 else:
 
-                    st.info(
-                        "No site risk records available."
+                    st.error(
+                        f"Site risk API failed. "
+                        f"Status code: {response.status_code}"
                     )
 
-            else:
+                    try:
+
+                        st.json(
+                            response.json()
+                        )
+
+                    except Exception:
+
+                        st.write(
+                            response.text
+                        )
+
+            # =========================================================
+            # CONNECTION ERROR
+            # =========================================================
+
+            except requests.exceptions.ConnectionError:
 
                 st.error(
-                    f"FastAPI returned HTTP "
-                    f"{response.status_code}"
+                    "🔴 Could not connect to FastAPI.\n\n"
+                    "Make sure the backend is running:\n\n"
+                    "`uvicorn backend.app.main:app --reload`"
                 )
 
-        except requests.exceptions.RequestException as error:
+            # =========================================================
+            # TIMEOUT ERROR
+            # =========================================================
 
-            st.error(
-                "Could not connect to the Site Risk API."
-            )
+            except requests.exceptions.Timeout:
 
-            st.code(
-                str(error)
-            )
+                st.error(
+                    "⏱️ Site risk analysis timed out."
+                )
 
+            # =========================================================
+            # OTHER ERROR
+            # =========================================================
 
-# ============================================================
-# Footer
-# ============================================================
+            except Exception as e:
 
-st.divider()
-
-st.caption(
-    "Construction Risk Intelligence Platform | "
-    "Agentic AI Safety Monitoring"
-)
+                st.error(
+                    f"An unexpected error occurred: {str(e)}"
+                )

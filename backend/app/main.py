@@ -168,3 +168,160 @@ async def analyze_ppe(
         "detections": detections,
         "safety_analysis": safety_result
     }
+
+# ============================================================
+# Combined Safety Analysis Endpoint
+# ============================================================
+
+@app.get("/combined-safety-analysis")
+def combined_safety_analysis():
+
+    # -----------------------------------------
+    # 1. Load site monitoring data
+    # -----------------------------------------
+
+    data_file = DATA_DIR / "site_monitoring.csv"
+
+    site_results = site_risk_agent.analyze_dataset(
+        str(data_file)
+    )
+
+    # -----------------------------------------
+    # 2. Select the latest site result
+    # -----------------------------------------
+
+    if not site_results:
+        return {
+            "error": "No site monitoring data found."
+        }
+
+    latest_site_result = site_results[-1]
+
+    # -----------------------------------------
+    # 3. No image is provided in this endpoint
+    # -----------------------------------------
+    # For now, we use an empty PPE result.
+    # Later we will connect the uploaded
+    # image directly to this endpoint.
+
+    ppe_result = {
+        "detections": []
+    }
+
+    # -----------------------------------------
+    # 4. Run Safety Agent
+    # -----------------------------------------
+
+    combined_result = safety_agent.analyze(
+        ppe_result,
+        latest_site_result
+    )
+
+    # -----------------------------------------
+    # 5. Return combined result
+    # -----------------------------------------
+
+    return {
+        "site_analysis": latest_site_result,
+        "combined_safety_analysis": combined_result
+    }
+
+# ============================================================
+# Combined PPE + Site Risk Analysis
+# ============================================================
+
+@app.post("/combined-safety-analysis")
+async def combined_safety_analysis(
+    file: UploadFile = File(...)
+):
+
+    # -----------------------------------------
+    # 1. Check PPE model
+    # -----------------------------------------
+
+    if ppe_detector is None:
+
+        return {
+            "error": "PPE model not found.",
+            "expected_model": str(MODEL_PATH)
+        }
+
+    # -----------------------------------------
+    # 2. Create upload directory
+    # -----------------------------------------
+
+    UPLOAD_DIR.mkdir(
+        parents=True,
+        exist_ok=True
+    )
+
+    # -----------------------------------------
+    # 3. Save uploaded image
+    # -----------------------------------------
+
+    safe_filename = Path(
+        file.filename
+    ).name
+
+    file_path = UPLOAD_DIR / safe_filename
+
+    with open(file_path, "wb") as buffer:
+
+        shutil.copyfileobj(
+            file.file,
+            buffer
+        )
+
+    # -----------------------------------------
+    # 4. Run PPE detection
+    # -----------------------------------------
+
+    detections = ppe_detector.detect(
+        str(file_path)
+    )
+
+    ppe_result = {
+        "detections": detections
+    }
+
+    # -----------------------------------------
+    # 5. Load site monitoring data
+    # -----------------------------------------
+
+    data_file = DATA_DIR / "site_monitoring.csv"
+
+    site_results = site_risk_agent.analyze_dataset(
+        str(data_file)
+    )
+
+    if not site_results:
+
+        return {
+            "error": "No site monitoring data found."
+        }
+
+    # -----------------------------------------
+    # 6. Use latest site result
+    # -----------------------------------------
+
+    latest_site_result = site_results[-1]
+
+    # -----------------------------------------
+    # 7. Run combined Safety Agent
+    # -----------------------------------------
+
+    combined_result = safety_agent.analyze(
+        ppe_result,
+        latest_site_result
+    )
+
+    # -----------------------------------------
+    # 8. Return final result
+    # -----------------------------------------
+
+    return {
+        "filename": safe_filename,
+        "ppe_detections": detections,
+        "site_analysis": latest_site_result,
+        "combined_safety_analysis": combined_result
+    }

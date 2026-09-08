@@ -1,367 +1,312 @@
-import pandas as pd
-
-
 class SafetyAgent:
     """
-    Safety Agent for construction worker safety.
+    Safety Agent for construction-site safety analysis.
 
-    Supports:
-    1. PPE analysis from YOLO detections
-    2. Worker safety analysis from CSV data
+    Combines:
+    1. PPE detection results
+    2. Site risk results
+
+    to generate an overall safety assessment.
     """
 
-    # PPE classes that represent violations
-    PPE_VIOLATIONS = {
-        "NO-Hardhat": "Missing hardhat",
-        "NO-Safety Vest": "Missing safety vest",
-        "NO-Mask": "Missing safety mask",
-    }
-
-    # PPE classes that represent compliant equipment
-    PPE_CLASSES = {
-        "Hardhat",
-        "Safety Vest",
-        "Mask",
-    }
-
-    def __init__(self):
-        pass
-
-    # =========================================================
-    # REAL-TIME PPE DETECTION ANALYSIS
-    # =========================================================
+    # ============================================================
+    # PPE-ONLY ANALYSIS
+    # ============================================================
 
     def analyze_detections(self, detections):
         """
-        Analyze PPE detections produced by the YOLO detector.
-
-        Example input:
-
-        [
-            {
-                "class": "Person",
-                "confidence": 0.94
-            },
-            {
-                "class": "Hardhat",
-                "confidence": 0.88
-            },
-            {
-                "class": "Safety Vest",
-                "confidence": 0.91
-            }
-        ]
+        Analyze PPE detections from the YOLO detector.
         """
 
-        violations = []
-        detected_ppe = []
-        detected_objects = []
-
-        # -----------------------------------------------------
-        # Process YOLO detections
-        # -----------------------------------------------------
+        hazards = []
+        recommendations = []
 
         for detection in detections:
 
-            class_name = detection.get("class")
-            confidence = detection.get("confidence", 0)
+            # ppe_detector.py returns:
+            # {"class": "NO-Hardhat", "confidence": 0.85}
 
-            if not class_name:
-                continue
+            class_name = str(
+                detection.get("class", "")
+            ).lower()
 
-            detected_objects.append(
-                {
-                    "class": class_name,
-                    "confidence": confidence
-                }
+            # Remove spaces so that:
+            # "no-safety vest"
+            # becomes:
+            # "no-safetyvest"
+
+            class_name = class_name.replace(" ", "")
+
+            # ----------------------------------------------------
+            # NO HARDHAT
+            # ----------------------------------------------------
+
+            if class_name == "no-hardhat":
+
+                hazards.append(
+                    "Worker without hardhat"
+                )
+
+                recommendations.append(
+                    "Ensure workers wear hardhats."
+                )
+
+            # ----------------------------------------------------
+            # NO MASK
+            # ----------------------------------------------------
+
+            elif class_name == "no-mask":
+
+                hazards.append(
+                    "Worker without mask"
+                )
+
+                recommendations.append(
+                    "Ensure workers wear required masks."
+                )
+
+            # ----------------------------------------------------
+            # NO SAFETY VEST
+            # ----------------------------------------------------
+
+            elif class_name == "no-safetyvest":
+
+                hazards.append(
+                    "Worker without safety vest"
+                )
+
+                recommendations.append(
+                    "Ensure workers wear safety vests."
+                )
+
+        # --------------------------------------------------------
+        # Remove duplicate hazards
+        # --------------------------------------------------------
+
+        hazards = list(
+            dict.fromkeys(hazards)
+        )
+
+        # --------------------------------------------------------
+        # Remove duplicate recommendations
+        # --------------------------------------------------------
+
+        recommendations = list(
+            dict.fromkeys(recommendations)
+        )
+
+        # --------------------------------------------------------
+        # Determine PPE risk
+        # --------------------------------------------------------
+
+        if hazards:
+
+            risk_level = "HIGH"
+
+            status = (
+                "PPE safety violation detected."
             )
 
-            # Check PPE violation
-            if class_name in self.PPE_VIOLATIONS:
+        else:
 
-                violation = self.PPE_VIOLATIONS[class_name]
+            risk_level = "LOW"
 
-                if violation not in violations:
-                    violations.append(violation)
+            status = (
+                "Required PPE appears compliant."
+            )
 
-            # Check correct PPE
-            elif class_name in self.PPE_CLASSES:
-
-                if class_name not in detected_ppe:
-                    detected_ppe.append(class_name)
-
-        # -----------------------------------------------------
-        # Calculate safety score
-        # -----------------------------------------------------
-
-        safety_score = 100
-
-        if "Missing hardhat" in violations:
-            safety_score -= 30
-
-        if "Missing safety vest" in violations:
-            safety_score -= 25
-
-        if "Missing safety mask" in violations:
-            safety_score -= 15
-
-        # Never allow negative score
-        safety_score = max(0, safety_score)
-
-        # -----------------------------------------------------
-        # Determine safety level
-        # -----------------------------------------------------
-
-        safety_level = self._get_safety_level(
-            safety_score
-        )
-
-        # -----------------------------------------------------
-        # Generate recommendation / alert
-        # -----------------------------------------------------
-
-        alert = self._generate_alert(
-            safety_level,
-            violations
-        )
-
-        # -----------------------------------------------------
-        # Return result
-        # -----------------------------------------------------
+        # --------------------------------------------------------
+        # Return PPE analysis
+        # --------------------------------------------------------
 
         return {
-            "detected_objects": detected_objects,
-            "detected_ppe": detected_ppe,
-            "violations": violations,
-            "safety_score": safety_score,
-            "safety_level": safety_level,
-            "alert": alert
+            "risk_level": risk_level,
+            "hazards": hazards,
+            "recommendations": recommendations,
+            "status": status
         }
 
-    # =========================================================
-    # SAFETY LEVEL
-    # =========================================================
+    # ============================================================
+    # COMBINED PPE + SITE RISK ANALYSIS
+    # ============================================================
 
-    def _get_safety_level(self, safety_score):
-
-        if safety_score >= 80:
-            return "SAFE"
-
-        elif safety_score >= 60:
-            return "MODERATE"
-
-        elif safety_score >= 40:
-            return "HIGH RISK"
-
-        else:
-            return "CRITICAL"
-
-    # =========================================================
-    # SAFETY ALERT
-    # =========================================================
-
-    def _generate_alert(
+    def analyze(
         self,
-        safety_level,
-        violations
+        ppe_result,
+        site_risk_result
     ):
+        """
+        Combine PPE analysis with site-risk analysis.
+        """
 
-        if safety_level == "SAFE":
+        hazards = []
+        recommendations = []
 
-            return (
-                "Worker PPE compliance is satisfactory. "
-                "Continue regular safety monitoring."
+        # ========================================================
+        # 1. PPE ANALYSIS
+        # ========================================================
+
+        ppe_detections = ppe_result.get(
+            "detections",
+            []
+        )
+
+        ppe_analysis = self.analyze_detections(
+            ppe_detections
+        )
+
+        # Add PPE hazards
+
+        hazards.extend(
+            ppe_analysis.get(
+                "hazards",
+                []
+            )
+        )
+
+        # Add PPE recommendations
+
+        recommendations.extend(
+            ppe_analysis.get(
+                "recommendations",
+                []
+            )
+        )
+
+        # ========================================================
+        # 2. SITE RISK ANALYSIS
+        # ========================================================
+
+        site_risk = site_risk_result.get(
+            "risk_score",
+            0
+        )
+
+        site_level = site_risk_result.get(
+            "risk_level",
+            "LOW"
+        )
+
+        site_hazards = site_risk_result.get(
+            "hazards",
+            []
+        )
+
+        # Add site hazards
+
+        hazards.extend(
+            site_hazards
+        )
+
+        # Add site recommendation
+
+        site_recommendation = site_risk_result.get(
+            "recommendation"
+        )
+
+        if site_recommendation:
+
+            recommendations.append(
+                site_recommendation
             )
 
-        elif safety_level == "MODERATE":
+        # ========================================================
+        # 3. DETERMINE OVERALL RISK
+        # ========================================================
 
-            return (
-                "Monitor the worker and improve PPE compliance."
+        risk_priority = {
+            "LOW": 1,
+            "MEDIUM": 2,
+            "HIGH": 3,
+            "CRITICAL": 4
+        }
+
+        # Start with site risk
+
+        overall_level = site_level
+
+        # Compare PPE risk with site risk
+
+        ppe_level = ppe_analysis.get(
+            "risk_level",
+            "LOW"
+        )
+
+        if risk_priority.get(
+            ppe_level,
+            1
+        ) > risk_priority.get(
+            overall_level,
+            1
+        ):
+
+            overall_level = ppe_level
+
+        # ========================================================
+        # 4. REMOVE DUPLICATES
+        # ========================================================
+
+        hazards = list(
+            dict.fromkeys(
+                hazards
+            )
+        )
+
+        recommendations = list(
+            dict.fromkeys(
+                recommendations
+            )
+        )
+
+        # ========================================================
+        # 5. GENERATE OVERALL STATUS
+        # ========================================================
+
+        if overall_level == "CRITICAL":
+
+            status = (
+                "Immediate action required."
             )
 
-        elif safety_level == "HIGH RISK":
+        elif overall_level == "HIGH":
 
-            if violations:
+            status = (
+                "Urgent safety intervention required."
+            )
 
-                return (
-                    "Urgent safety action required. "
-                    "Detected violations: "
-                    + ", ".join(violations)
-                )
+        elif overall_level == "MEDIUM":
 
-            return (
-                "Urgent safety action required. "
-                "PPE compliance is inadequate."
+            status = (
+                "Preventive safety action recommended."
             )
 
         else:
 
-            return (
-                "Immediate intervention required. "
-                "Critical PPE violations detected: "
-                + ", ".join(violations)
+            status = (
+                "Site conditions are currently acceptable."
             )
 
-    # =========================================================
-    # CSV WORKER SAFETY ANALYSIS
-    # =========================================================
+        # ========================================================
+        # 6. FINAL COMBINED RESULT
+        # ========================================================
 
-    def analyze_dataset(self, file_path):
-        """
-        Analyze the existing worker_monitoring.csv.
+        return {
 
-        This method is kept so your existing
-        /safety-risk API and manual test data continue to work.
-        """
+            "overall_risk_level":
+                overall_level,
 
-        df = pd.read_csv(file_path)
+            "site_risk_score":
+                site_risk,
 
-        results = []
+            "ppe_risk_level":
+                ppe_level,
 
-        for _, row in df.iterrows():
+            "hazards":
+                hazards,
 
-            violations = []
+            "recommendations":
+                recommendations,
 
-            # -------------------------------------------------
-            # Check helmet
-            # -------------------------------------------------
-
-            if str(
-                row.get("helmet", "yes")
-            ).strip().lower() != "yes":
-
-                violations.append(
-                    "Missing hardhat"
-                )
-
-            # -------------------------------------------------
-            # Check safety vest
-            # -------------------------------------------------
-
-            if str(
-                row.get("safety_vest", "yes")
-            ).strip().lower() != "yes":
-
-                violations.append(
-                    "Missing safety vest"
-                )
-
-            # -------------------------------------------------
-            # Check safety boots
-            # -------------------------------------------------
-
-            if str(
-                row.get("safety_boots", "yes")
-            ).strip().lower() != "yes":
-
-                violations.append(
-                    "Missing safety boots"
-                )
-
-            # -------------------------------------------------
-            # Check gloves
-            # -------------------------------------------------
-
-            if str(
-                row.get("gloves", "yes")
-            ).strip().lower() != "yes":
-
-                violations.append(
-                    "Missing gloves"
-                )
-
-            # -------------------------------------------------
-            # Calculate score
-            # -------------------------------------------------
-
-            safety_score = 100
-
-            if "Missing hardhat" in violations:
-                safety_score -= 20
-
-            if "Missing safety vest" in violations:
-                safety_score -= 15
-
-            if "Missing safety boots" in violations:
-                safety_score -= 15
-
-            if "Missing gloves" in violations:
-                safety_score -= 10
-
-            safety_score = max(
-                0,
-                safety_score
-            )
-
-            # -------------------------------------------------
-            # Safety level
-            # -------------------------------------------------
-
-            safety_level = self._get_safety_level(
-                safety_score
-            )
-
-            # -------------------------------------------------
-            # Recommendation
-            # -------------------------------------------------
-
-            if safety_level == "SAFE":
-
-                recommendation = (
-                    "Worker safety conditions are acceptable. "
-                    "Continue regular monitoring."
-                )
-
-            elif safety_level == "MODERATE":
-
-                recommendation = (
-                    "Monitor the worker and take "
-                    "preventive safety measures."
-                )
-
-            elif safety_level == "HIGH RISK":
-
-                recommendation = (
-                    "Urgent safety review and "
-                    "corrective action required."
-                )
-
-            else:
-
-                recommendation = (
-                    "Immediate intervention and "
-                    "corrective action required."
-                )
-
-            # -------------------------------------------------
-            # Build result
-            # -------------------------------------------------
-
-            result = {
-                "site_id": row.get(
-                    "site_id",
-                    "UNKNOWN"
-                ),
-
-                "worker_id": row.get(
-                    "worker_id",
-                    "UNKNOWN"
-                ),
-
-                "timestamp": row.get(
-                    "timestamp",
-                    ""
-                ),
-
-                "safety_score": safety_score,
-
-                "safety_level": safety_level,
-
-                "ppe_violations": violations,
-
-                "recommendation": recommendation
-            }
-
-            results.append(result)
-
-        return results
+            "status":
+                status
+        }
