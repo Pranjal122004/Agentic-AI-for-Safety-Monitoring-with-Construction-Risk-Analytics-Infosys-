@@ -1,7 +1,10 @@
-from pathlib import Path
+﻿from pathlib import Path
 import shutil
 import base64
 from datetime import datetime
+from backend.app.agents.reporting_agent import ReportingAgent
+from backend.app.agents.risk_intelligence_agent import RiskIntelligenceAgent
+from backend.app.agents.orchestrator import AgentOrchestrator
 
 from fastapi import FastAPI, UploadFile, File
 
@@ -50,6 +53,17 @@ safety_agent = SafetyAgent()
 compliance_agent = ComplianceAgent()
 
 insurance_agent = InsuranceAgent()
+reporting_agent = ReportingAgent()
+
+risk_intelligence_agent = RiskIntelligenceAgent()
+
+agent_orchestrator = AgentOrchestrator(
+    safety_agent=safety_agent,
+    compliance_agent=compliance_agent,
+    insurance_agent=insurance_agent,
+    risk_intelligence_agent=risk_intelligence_agent,
+    reporting_agent=reporting_agent
+)
 
 
 # ============================================================
@@ -101,15 +115,111 @@ def get_site_risk():
     data_file = DATA_DIR / "site_monitoring.csv"
 
     if not data_file.exists():
-
         return {
             "error": "Site monitoring data file not found.",
             "expected_file": str(data_file)
         }
 
-    results = site_risk_agent.analyze_dataset(
+    # Run the existing Site Risk Agent
+    risk_results = site_risk_agent.analyze_dataset(
         str(data_file)
     )
+
+    # Read the original monitoring data
+    import csv
+
+    with open(
+        data_file,
+        "r",
+        newline="",
+        encoding="utf-8"
+    ) as csv_file:
+
+        reader = csv.DictReader(csv_file)
+
+        monitoring_rows = list(reader)
+
+    results = []
+
+    for index, risk_result in enumerate(risk_results):
+
+        if not isinstance(risk_result, dict):
+            continue
+
+        row = {}
+
+        # Original monitoring information
+        if index < len(monitoring_rows):
+
+            original = monitoring_rows[index]
+
+            row["site_id"] = original.get(
+                "site_id",
+                risk_result.get("site_id", "UNKNOWN")
+            )
+
+            row["timestamp"] = original.get(
+                "timestamp",
+                "UNKNOWN"
+            )
+
+            row["temperature"] = original.get(
+                "temperature",
+                "Not available"
+            )
+
+            row["humidity"] = original.get(
+                "humidity",
+                "Not available"
+            )
+
+            row["dust_level"] = original.get(
+                "dust_level",
+                "Not available"
+            )
+
+            row["noise_level"] = original.get(
+                "noise_level",
+                "Not available"
+            )
+
+            row["equipment_status"] = original.get(
+                "equipment_status",
+                "Not available"
+            )
+
+            row["worker_count"] = original.get(
+                "worker_count",
+                "Not available"
+            )
+
+            row["unsafe_condition"] = original.get(
+                "unsafe_condition",
+                "Not available"
+            )
+
+        # AI-generated risk information
+        row["risk_score"] = risk_result.get(
+            "risk_score",
+            0
+        )
+
+        row["risk_level"] = risk_result.get(
+            "risk_level",
+            "UNKNOWN"
+        )
+
+        row["hazards"] = risk_result.get(
+            "hazards",
+            []
+        )
+
+        row["recommendation"] = risk_result.get(
+            "recommendation",
+            "No recommendation available."
+        )
+
+        results.append(row)
 
     return {
         "total_records": len(results),
@@ -887,3 +997,51 @@ async def analyze_risk(
                 claim_risk
         }
     }
+
+@app.post("/generate-report")
+async def generate_report(request: dict):
+    site_risk_result = request.get("site_risk_result", {})
+    safety_result = request.get("safety_result", {})
+    compliance_result = request.get("compliance_result", {})
+    insurance_result = request.get("insurance_result", {})
+
+    risk_intelligence_result = risk_intelligence_agent.analyze(
+        site_risk_result=site_risk_result,
+        safety_result=safety_result
+    )
+
+    report = reporting_agent.generate_report(
+        site_risk_result=site_risk_result,
+        safety_result=safety_result,
+        compliance_result=compliance_result,
+        insurance_result=insurance_result,
+        risk_intelligence_result=risk_intelligence_result
+    )
+
+    return report
+
+
+@app.post("/risk-intelligence")
+async def risk_intelligence(request: dict):
+    site_risk_result = request.get("site_risk_result", {})
+    safety_result = request.get("safety_result", {})
+
+    result = risk_intelligence_agent.analyze(
+        site_risk_result=site_risk_result,
+        safety_result=safety_result
+    )
+
+    return result
+
+@app.post("/agent-orchestration")
+async def agent_orchestration(request: dict):
+
+    ppe_result = request.get("ppe_result", {})
+    site_risk_result = request.get("site_risk_result", {})
+
+    result = agent_orchestrator.run(
+        ppe_result=ppe_result,
+        site_risk_result=site_risk_result
+    )
+
+    return result
