@@ -10,3 +10,7 @@ runs/
 
 backend/data/ppe_dataset/
 css-data/
+
+# Python cache files
+__pycache__/
+*.pyc
